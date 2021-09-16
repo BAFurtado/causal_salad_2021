@@ -1,5 +1,4 @@
 # Causal Inference Workshop - 9 September 2021
-
 library(rethinking)
 
 ####################################################
@@ -9,10 +8,10 @@ library(rethinking)
 set.seed(1908)
 N <- 200 # number of pairs
 # birth order and family sizes
-B1 <- rbinom(N,size=1,prob=0.5) # 50% first borns
-M <- rnorm( N , 2*B1 )
-B2 <- rbinom(N,size=1,prob=0.5)
-D <- rnorm( N , 2*B2 + 0*M ) # change the 0 to turn on causal influence of mom
+B1 <- rbinom(N, size=1, prob=0.5) # 50% first borns
+M <- rnorm( N, 2*B1 )
+B2 <- rbinom(N, size=1, prob=0.5)
+D <- rnorm( N, 2*B2 + 0*M ) # change the 0 to turn on causal influence of mom
 
 # model with B1 has worse precision, model with B2 has better precision
 # what is going on here?
