@@ -16,12 +16,11 @@ for e in G.edges:
                 xy=pos[e[0]],
                 xytext=pos[e[1]],
                 arrowprops=dict(arrowstyle=arrow_styles[e[2]], color="red",
-                                shrinkA=10, shrinkB=10,
+                                shrinkA=15, shrinkB=14,
                                 mutation_scale=35,
-                                connectionstyle="arc3,rad=rrr".replace('rrr', str(2 * (e[2] - 0.5))
-                                                                       ),
-                                )
+                                connectionstyle=f"arc3,rad={(2 * (e[2] - 0.5))}"),
                 )
+
 for n in G.nodes:
     ax.annotate(names[n], xy=pos[n], color='blue', fontsize=50)
 plt.tight_layout()

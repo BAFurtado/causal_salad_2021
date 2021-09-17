@@ -1,3 +1,9 @@
+# This is a fork of the original work
+#### I'll use it to learn basic R (to complement python when needed)
+#### If I have time, I may try to convert causal_salad, the code attached to the youtube presentation (link below) into Python.
+#### These are just some notes as I read along Rethinking Statistical.
+
+
 # causal_salad_2021
 One day course on causal inference, MPI-EVA 9 September 2021
 
