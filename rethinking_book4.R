@@ -58,4 +58,182 @@ sample_sigma <- runif( 1e4 , 0 , 50 )
 prior_h <- rnorm( 1e4 , sample_mu , sample_sigma )
 dens( prior_h )
 
+# First problem with two parameters
+# Starting with brute force, later to substitute by quadratic approximation
+# 1. Cria duas listas
+mu.list <- seq( from=150, to=160 , length.out=100 )
+sigma.list <- seq( from=7 , to=9 , length.out=100 )
+# 2. Junta, todoso com toso
+post <- expand.grid( mu=mu.list , sigma=sigma.list )
+# 3. Soma o log
+post$LL <- sapply( 1:nrow(post) , function(i) sum(
+dnorm( d2$height , post$mu[i] , post$sigma[i] , log=TRUE ) ) )
+# 4. Soma o log com uma normal dos dados, junto com os parâmetros
+post$prod <- post$LL + dnorm( post$mu , 178 , 20 , TRUE ) +
+dunif( post$sigma , 0 , 50 , TRUE )
+# 5. Exponential do produto - máxio
+post$prob <- exp( post$prod - max(post$prod) )
+# 6. Plot
+contour_xyz( post$mu , post$sigma , post$prob )
+# Heatmap
+image_xyz( post$mu , post$sigma , post$prob )
+
+# Sampling
+sample.rows <- sample( 1:nrow(post) , size=1e4 , replace=TRUE ,
+prob=post$prob )
+sample.mu <- post$mu[ sample.rows ]
+sample.sigma <- post$sigma[ sample.rows ]
+# Plot
+plot( sample.mu , sample.sigma , cex=0.4 , pch=16 , col=col.alpha("red",.1) )
+
+# Characterizing the distributions
+dens(sample.mu)
+dens(sample.sigma)
+
+PI(sample.mu)
+PI(sample.sigma)
+
+# Analyzing sample data to check height problem
+d3 <- sample( d2$height , size=20 )
+# Doing just for the small samples, same steps.
+mu.list <- seq( from=150, to=170 , length.out=200 )
+sigma.list <- seq( from=4 , to=20 , length.out=200 )
+post2 <- expand.grid( mu=mu.list , sigma=sigma.list )
+post2$LL <- sapply( 1:nrow(post2) , function(i)
+sum( dnorm( d3 , mean=post2$mu[i] , sd=post2$sigma[i] ,
+log=TRUE ) ) )
+post2$prod <- post2$LL + dnorm( post2$mu , 178 , 20 , TRUE ) +
+dunif( post2$sigma , 0 , 50 , TRUE )
+post2$prob <- exp( post2$prod - max(post2$prod) )
+sample2.rows <- sample( 1:nrow(post2) , size=1e4 , replace=TRUE ,
+prob=post2$prob )
+sample2.mu <- post2$mu[ sample2.rows ]
+sample2.sigma <- post2$sigma[ sample2.rows ]
+plot( sample2.mu , sample2.sigma , cex=0.5 ,
+col=col.alpha("red",0.1) ,
+xlab="mu" , ylab="sigma" , pch=16 )
+
+dens( sample2.sigma , norm.comp=TRUE )
+
+# Using QUADRATIC APPROXIMATION
+library(rethinking)
+data(Howell1)
+d <- Howell1
+d2 <- d[ d$age >= 18 , ]
+
+# DEFINING THE MODEL
+flist <- alist(
+height ~ dnorm( mu , sigma ) ,
+mu ~ dnorm( 178 , 20 ) ,
+sigma ~ dunif( 0 , 50 )
+)
+
+# FITTING THE MODEL
+m4.1 <- quap( flist , data=d2 )
+
+# Taking a look at the model
+precis(m4.1)
+
+# Another model with quite a narrow prior
+m4.2 <- quap(
+alist(
+height ~ dnorm( mu , sigma ) ,
+mu ~ dnorm( 178 , 0.1 ) ,
+sigma ~ dunif( 0 , 50 )
+) , data=d2 )
+precis( m4.2 )
+
+vcov(m4.1)
+diag( vcov( m4.1 ) )
+cov2cor( vcov( m4.1 ) )
+
+post <- extract.samples( m4.1 , n=1e4 )
+head(post)
+precis(post)
+plot(post)
+
+# L I N E A R  R E G R E S S I O N
+plot( d2$height ~ d2$weight )
+
+library(rethinking)
+# PRIORS -- getting a hand of what the choice of prior imply
+set.seed(2971)
+N <- 100  # 100 lines
+a <- rnorm( N , 178 , 20 )
+b <- rnorm( N , 0 , 10 )
+# Plot
+plot( NULL , xlim=range(d2$weight) , ylim=c(-100,400) , xlab="weight" , ylab="height" )
+abline( h=0 , lty=2 )
+abline( h=272 , lty=1 , lwd=0.5 )
+mtext( "b ~ dnorm(0,10)" )
+xbar <- mean(d2$weight)
+for ( i in 1:N ) curve( a[i] + b[i]*(x - xbar) ,
+from=min(d2$weight) , to=max(d2$weight) , add=TRUE ,
+col=col.alpha("black",0.2) )
+
+# Using the \beta ~ log-normal(0,1)
+b <- rlnorm( 1e4 , 0 , 1 )
+dens( b , xlim=c(0,5) , adj=0.1 )
+
+set.seed(2971)
+N <- 100
+ # 100 lines
+a <- rnorm( N , 178 , 20 )
+b <- rlnorm( N , 0 , 1 )
+# Then use plot above again
+
+# Finding the posterior distribution
+# load data again, since it's a long way back
+library(rethinking)
+data(Howell1); d <- Howell1; d2 <- d[ d$age >= 18 , ]
+
+# define the average weight, x-bar
+xbar <- mean(d2$weight)
+
+# fit model
+m4.3 <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a + b*( weight - xbar ) ,
+    a ~ dnorm( 178 , 20 ) ,
+    b ~ dlnorm( 0 , 1 ) ,
+    sigma ~ dunif( 0 , 50 )
+) , data=d2 )
+
+precis(m4.3)
+round(vcov(m4.3), 3)
+pairs(m4.3)
+
+# Doing the plotting and completing analysis of the posterior
+plot( height ~ weight , data=d2 , col="red" )
+post <- extract.samples( m4.3 )
+a_map <- mean(post$a)
+b_map <- mean(post$b)
+curve( a_map + b_map*(x - xbar) , add=TRUE )
+
+# Restimating model with just 10 data cases and plotting
+# And then, 50, 150, 352
+N <- 352
+dN <- d2[ 1:N , ]
+mN <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a + b*( weight - mean(weight) ) ,
+    a ~ dnorm( 178 , 20 ) ,
+    b ~ dlnorm( 0 , 1 ) ,
+    sigma ~ dunif( 0 , 50 )
+) , data=dN )
+
+# extract 20 samples from the posterior
+post <- extract.samples( mN , n=20 )
+# display raw data and sample size
+plot( dN$weight , dN$height ,
+      xlim=range(d2$weight) , ylim=range(d2$height) ,
+      col="red" , xlab="weight" , ylab="height" )
+mtext(concat("N = ",N))
+# plot the lines, with transparency
+for ( i in 1:20 )
+curve( post$a[i] + post$b[i]*(x-mean(dN$weight)) ,
+col=col.alpha("black",0.3) , add=TRUE )
+
 
