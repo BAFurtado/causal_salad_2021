@@ -236,4 +236,49 @@ for ( i in 1:20 )
 curve( post$a[i] + post$b[i]*(x-mean(dN$weight)) ,
 col=col.alpha("black",0.3) , add=TRUE )
 
+# Getting somebody who weights 50
+post <- extract.samples( m4.3 )
+mu_at_50 <- post$a + post$b * ( 50 - xbar )
+dens( mu_at_50 , col="red" , lwd=2 , xlab="mu|weight=50" )
+# Very restrict: narrow with max and min distant 2.68 cm of height
+PI( mu_at_50 , prob=0.89 )
+max(mu_at_50)
+min(mu_at_50)
+
+#  take your quap approximation, sample from the posterior
+# distribution, and then compute μ
+# for each case in the data and sample from the posterior
+# distribution.
+mu <- link( m4.3 )
+str(mu)
+
+# Now actually doing that for values: from 25 to 75
+# define sequence of weights to compute predictions for
+# these values will be on the horizontal axis
+weight.seq <- seq( from=25 , to=70 , by=1 )
+
+# use link to compute mu
+# for each sample from posterior
+# and for each weight in weight.seq
+mu <- link( m4.3 , data=data.frame(weight=weight.seq) )
+str(mu)
+
+# use type="n" to hide raw data
+plot( height ~ weight , d2 , type="n" )
+
+# loop over samples and plot each mu value
+for ( i in 1:100 )
+points( weight.seq , mu[i,] , pch=16 , col=col.alpha("red",0.1) )
+
+# summarize the distribution of mu
+mu.mean <- apply( mu , 2 , mean )
+mu.PI <- apply( mu , 2 , PI , prob=0.89 )
+
+# plot raw data
+# fading out points to make line and interval more visible
+plot( height ~ weight , data=d2 , col=col.alpha("red",0.5) )
+# plot the MAP line, aka the mean mu for each weight
+lines( weight.seq , mu.mean )
+# plot a shaded region for 89% PI
+shade( mu.PI , weight.seq )
 
