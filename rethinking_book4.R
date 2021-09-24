@@ -282,3 +282,146 @@ lines( weight.seq , mu.mean )
 # plot a shaded region for 89% PI
 shade( mu.PI , weight.seq )
 
+# Considering uncertainty in sigma and mu to predict height.
+# collection of simulated heights that embody the uncertainty in the posterior as well as the uncertainty
+# in the Gaussian distribution of heights.
+library(rethinking)
+sim.height <- sim( m4.3 , data=list(weight=weight.seq) )
+# This is **simulated height**, not distributions of plausible average height
+str(sim.height)
+height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
+
+# Plotting: (a) average line, (b) shaded region of plausible mu
+# (c) boundaries of simulated heights
+# plot raw data
+plot( height ~ weight , d2 , col=col.alpha("red",0.5) )
+# draw MAP line
+lines( weight.seq , mu.mean )
+# draw HPDI region for line
+mu.HPDI <- apply(mu, 2, HPDI, prob = 0.89)
+shade( mu.HPDI , weight.seq )
+# draw PI region for simulated heights
+shade( height.PI , weight.seq )
+
+# POLYNOMIAL REGRESSIONS -- using squares and cubes as extra predictors
+library(rethinking)
+data(Howell1)
+d <- Howell1
+plot(height ~ weight, d)
+
+# standardizing the variable and saving quadratic form
+d$weight_s <- ( d$weight - mean(d$weight) )/sd(d$weight)
+d$weight_s2 <- d$weight_s^2
+
+# Model
+m4.5 <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a + b1*weight_s + b2*weight_s2 ,
+    a ~ dnorm( 178 , 20 ) ,
+    b1 ~ dlnorm( 0 , 1 ) ,
+    b2 ~ dnorm( 0 , 1 ) ,
+    sigma ~ dunif( 0 , 50 )
+) , data=d )
+
+# mean relationshipes at the 89% interval and mean predictions
+weight.seq <- seq( from=-2.2 , to=2 , length.out=30 )
+pred_dat <- list( weight_s=weight.seq , weight_s2=weight.seq^2 )
+mu <- link( m4.5 , data=pred_dat )
+mu.mean <- apply( mu , 2 , mean )
+mu.PI <- apply( mu , 2 , PI , prob=0.89 )
+sim.height <- sim( m4.5 , data=pred_dat )
+height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
+
+# And plotting ...
+plot( height ~ weight_s , d , col=col.alpha("red",0.5) )
+lines( weight.seq , mu.mean )
+shade( mu.PI , weight.seq )
+shade( height.PI , weight.seq )
+
+# Cubic regression
+d$weight_s3 <- d$weight_s^3
+m4.6 <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a + b1*weight_s + b2*weight_s2 + b3*weight_s3 ,
+    a ~ dnorm( 178 , 20 ) ,
+    b1 ~ dlnorm( 0 , 1 ) ,
+    b2 ~ dnorm( 0 , 10 ) ,
+    b3 ~ dnorm( 0 , 10 ) ,
+    sigma ~ dunif( 0 , 50 )
+) , data=d )
+
+# mean relationshipes at the 89% interval and mean predictions
+weight.seq <- seq( from=-2.2 , to=2 , length.out=30 )
+pred_dat <- list( weight_s=weight.seq , weight_s2=weight.seq^2 ,  weight_s3=weight.seq^3)
+mu <- link( m4.6 , data=pred_dat )
+mu.mean <- apply( mu , 2 , mean )
+mu.PI <- apply( mu , 2 , PI , prob=0.89 )
+sim.height <- sim( m4.6 , data=pred_dat )
+height.PI <- apply( sim.height , 2 , PI , prob=0.89 )
+
+# And plotting ...
+plot( height ~ weight_s, d , col=col.alpha("red",0.5) )
+lines( weight.seq , mu.mean )
+shade( mu.PI , weight.seq )
+shade( height.PI , weight.seq )
+
+# Plotting back with natural scale
+# 1. Use xaxt="n" to turn off the horizontal axis
+plot( height ~ weight_s , d , col=col.alpha("red",0.5) , xaxt="n" )
+lines( weight.seq , mu.mean )
+shade( mu.PI , weight.seq )
+shade( height.PI , weight.seq )
+# 2. Then explicitly construct the axis
+at <- c(-2,-1,0,1,2)
+labels <- at*sd(d$weight) + mean(d$weight)
+axis( side=1 , at=at , labels=round(labels,1) )
+
+# Blossomings of Cherry trees in Japan.
+library(rethinking)
+data(cherry_blossoms)
+d <- cherry_blossoms
+precis(d)
+
+# Drawing splines
+d2 <- d[ complete.cases(d$doy) , ] # complete cases on doy
+num_knots <- 15
+knot_list <- quantile( d2$year , probs=seq(0,1,length.out=num_knots) )
+
+# Building basis functions
+library(splines)
+B <- bs(d2$year,
+knots=knot_list[-c(1,num_knots)] ,
+degree=3 , intercept=TRUE )
+
+# Display the BASIS FUNCTION
+plot( NULL , xlim=range(d2$year) , ylim=c(0,1) , xlab="year" , ylab="basis" )
+for ( i in 1:ncol(B) ) lines( d2$year , B[,i] )
+
+# THE MODEL
+m4.7 <- quap(
+  alist(
+    D ~ dnorm( mu , sigma ) ,
+    mu <- a + B %*% w ,
+    a ~ dnorm(100,10),
+    w ~ dnorm(0,10),
+    sigma ~ dexp(1)
+  ), data=list( D=d2$doy , B=B ) ,
+  start=list( w=rep( 0 , ncol(B) ) ) )
+
+# Weighted basis function
+post <- extract.samples( m4.7 )
+w <- apply( post$w , 2 , mean )
+plot( NULL , xlim=range(d2$year) , ylim=c(-6,6) ,
+      xlab="year" , ylab="basis * weight" )
+for ( i in 1:ncol(B) ) lines( d2$year , w[i]*B[,i] )
+
+# Posterior interval at 97%
+mu <- link( m4.7 )
+mu_PI <- apply(mu,2,PI,0.97)
+plot( d2$year , d2$doy , col=col.alpha("red",0.3) , pch=16 )
+shade( mu_PI , d2$year , col=col.alpha("black",0.5) )
+
+
+
