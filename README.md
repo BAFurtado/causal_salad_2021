@@ -24,3 +24,9 @@ The code for the examples in the lecture are found in the R script.
 
 ## Recording
 The presentation was recorded and is available here https://www.youtube.com/watch?v=KNPYUVmY3NM
+
+## Linear regression
+![img.png](img.png)
+
+##  Ex.4m3
+![img_1.png](img_1.png)
