@@ -171,3 +171,141 @@ plot( sim_dat$M , colMeans(s) , ylim=c(-2,2) , type="l" ,
 xlab="manipulated M" , ylab="counterfactual D" )
 shade( apply(s,2,PI) , sim_dat$M )
 mtext( "Total counterfactual effect of M on D" )
+
+# Another examplo -- milk dataset
+data(milk)
+d <- milk
+str(d)
+
+d$K <- standardize( d$kcal.per.g )
+d$N <- standardize( d$neocortex.perc )
+d$M <- standardize( log(d$mass) )
+
+# MISSING DATA MISSING DATA MISSING DATA
+# New data.frame with no missing data. NOTE. Only 17 observations
+dcc <- d[ complete.cases(d$K,d$N,d$M) , ]
+
+m5.5_draft <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N ,
+    a ~ dnorm( 0 , 1 ) ,
+    bN ~ dnorm( 0 , 1 ) ,
+    sigma ~ dexp( 1 )
+) , data=dcc )
+
+# Testing to see if PRIORS are reasonable
+prior <- extract.prior( m5.5_draft )
+xseq <- c(-2,2)
+mu <- link( m5.5_draft , post=prior , data=list(N=xseq) )
+
+plot( NULL , xlim=xseq , ylim=xseq )
+for ( i in 1:50 ) lines( xseq , mu[i,] , col=col.alpha("black",0.3) )
+
+m5.5 <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ) ,
+    mu <- a + bN*N ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bN ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+) , data=dcc )
+
+# Plotting on my own
+prior <- extract.prior( m5.5 )
+xseq <- c(-2,2)
+mu <- link( m5.5 , post=prior , data=list(N=xseq) )
+
+plot( NULL , xlim=xseq , ylim=xseq )
+for ( i in 1:50 ) lines( xseq , mu[i,] , col=col.alpha("red",.7) )
+
+# CHECKING THE POSTERIOR
+precis(m5.5)
+
+# Plotting
+xseq <- seq( from=min(dcc$N)-0.15 , to=max(dcc$N)+0.15 , length.out=30 )
+mu <- link( m5.5 , data=list(N=xseq) )
+mu_mean <- apply(mu,2,mean)
+mu_PI <- apply(mu,2,PI)
+plot( K ~ N , data=dcc )
+lines( xseq , mu_mean , lwd=2 )
+shade( mu_PI , xseq )
+
+m5.6 <- quap(
+alist(
+K ~ dnorm( mu , sigma ) ,
+mu <- a + bM*M ,
+a ~ dnorm( 0 , 0.2 ) ,
+bM ~ dnorm( 0 , 0.5 ) ,
+sigma ~ dexp( 1 )
+) , data=dcc )
+precis(m5.6)
+
+
+m5.7 <- quap(
+alist(
+K ~ dnorm( mu , sigma ) ,
+mu <- a + bN*N + bM*M ,
+a ~ dnorm( 0 , 0.2 ) ,
+bN ~ dnorm( 0 , 0.5 ) ,
+bM ~ dnorm( 0 , 0.5 ) ,
+sigma ~ dexp( 1 )
+) , data=dcc )
+precis(m5.7)
+
+plot( coeftab( m5.5 , m5.6 , m5.7 ) , pars=c("bM","bN") )
+
+# MARKOV EQUIVALENCE OF ALL DAGS
+library(dagitty)
+dag5.7 <- dagitty( "dag{
+M -> K <- N
+M -> N }" )
+coordinates(dag5.7) <- list( x=c(M=0,K=1,N=2) , y=c(M=0.5,K=1,N=0.5) )
+MElist <- equivalentDAGs(dag5.7)
+drawdag(MElist)
+
+# CATEGORICAL VARIABLES
+data(Howell1)
+d <- Howell1
+str(d)
+
+mu_female <- rnorm(1e4,178,20)
+mu_male <- rnorm(1e4,178,20) + rnorm(1e4,0,10)
+precis( data.frame( mu_female , mu_male ) )
+
+# Creating a dummy non-numerical variable
+d$sex <- ifelse( d$male==1 , 2 , 1 )
+str( d$sex )
+
+m5.8 <- quap(
+  alist(
+    height ~ dnorm( mu , sigma ) ,
+    mu <- a[sex] ,
+    a[sex] ~ dnorm( 178 , 20 ) ,
+    sigma ~ dunif( 0 , 50 )
+) , data=d )
+precis( m5.8 , depth=2 )
+
+# Difference between sexes
+post <- extract.samples(m5.8)
+post$diff_fm <- post$a[,1] - post$a[,2]
+precis( post , depth=2 )
+
+data(milk)
+d <- milk
+str(d)
+levels(d$clade)
+# Forcing dummy as integers to USE AS INDEX
+d$clade_id <- as.integer( d$clade )
+
+d$K <- standardize( d$kcal.per.g )
+m5.9 <- quap(
+  alist(
+    K ~ dnorm( mu , sigma ),
+    mu <- a[clade_id],
+    a[clade_id] ~ dnorm( 0 , 0.5 ),
+    sigma ~ dexp( 1 )
+) , data=d )
+labels <- paste( "a[" , 1:4 , "]:" , levels(d$clade), sep="")
+plot( precis( m5.9 , depth=2 , pars="a" ) , labels=labels ,
+xlab="expected kcal (std)" )
