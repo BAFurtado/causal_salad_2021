@@ -69,4 +69,105 @@ impliedConditionalIndependencies(DMA_dag1)
 DMA_dag2 <- dagitty('dag{ D <- A -> M }')
 impliedConditionalIndependencies( DMA_dag2 )
 
+# The Marriage model from the DAG
+m5.3 <- quap(
+  alist(
+    D ~ dnorm( mu , sigma ) ,
+    mu <- a + bM*M + bA*A ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bM ~ dnorm( 0 , 0.5 ) ,
+    bA ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+  ) , data = d )
 
+precis( m5.3 )
+
+plot( coeftab(m5.1,m5.2,m5.3), par=c("bA","bM") )
+
+# Predictor RESIDUAL plots
+m5.4 <- quap(
+  alist(
+    M ~ dnorm( mu , sigma ) ,
+    mu <- a + bAM * A ,
+    a ~ dnorm( 0 , 0.2 ) ,
+    bAM ~ dnorm( 0 , 0.5 ) ,
+    sigma ~ dexp( 1 )
+) , data = d )
+
+mu <- link(m5.4)
+mu_mean <- apply( mu , 2 , mean )
+mu_resid <- d$M - mu_mean
+
+# Posterior PREDICTION Plots
+# call link without specifying new data
+# so it uses original data
+mu <- link( m5.3 )
+# summarize samples across cases
+mu_mean <- apply( mu , 2 , mean )
+mu_PI <- apply( mu , 2 , PI )
+# simulate observations
+# again no new data, so uses original data
+D_sim <- sim( m5.3 , n=1e4 )
+D_PI <- apply( D_sim , 2 , PI )
+
+plot( mu_mean ~ d$D , col="red", ylim=range(mu_PI) ,
+xlab="Observed divorce" , ylab="Predicted divorce" )
+abline( a=0 , b=1 , lty=2 )
+for ( i in 1:nrow(d) ) lines( rep(d$D[i],2) , mu_PI[,i] , col="red" )
+# label points -- not working for PyCharm
+identify( x=d$D , y=mu_mean , labels=d$Loc )
+
+# Counterfactual plots
+# Full model with two regressions
+data(WaffleDivorce)
+d <- list()
+d$A <- standardize( WaffleDivorce$MedianAgeMarriage )
+d$D <- standardize( WaffleDivorce$Divorce )
+d$M <- standardize( WaffleDivorce$Marriage )
+
+m5.3_A <- quap(
+  alist(## A -> D <- M
+          D ~ dnorm( mu , sigma ) ,
+          mu <- a + bM*M + bA*A ,
+          a ~ dnorm( 0 , 0.2 ) ,
+          bM ~ dnorm( 0 , 0.5 ) ,
+          bA ~ dnorm( 0 , 0.5 ) ,
+          sigma ~ dexp( 1 ),
+        ## A -> M
+          M ~ dnorm( mu_M , sigma_M ),
+          mu_M <- aM + bAM*A,
+          aM ~ dnorm( 0 , 0.2 ),
+          bAM ~ dnorm( 0 , 0.5 ),
+          sigma_M ~ dexp( 1 )
+) , data = d )
+
+precis(m5.3_A)
+
+# range of values for A
+A_seq <- seq( from=-2 , to=2 , length.out=30 )
+
+# Simulating M first, then D
+# prep data
+sim_dat <- data.frame( A=A_seq )
+# simulate M and then D, using A_seq
+s <- sim( m5.3_A , data=sim_dat , vars=c("M","D") )
+
+# Plot
+plot( sim_dat$A , colMeans(s$D) , ylim=c(-2,2) , type="l" ,
+xlab="manipulated A" , ylab="counterfactual D" )
+shade( apply(s$D,2,PI) , sim_dat$A )
+mtext( "Total counterfactual effect of A on D" )
+
+# Numerical findings
+#Expected causal effect of increasig median age at marriage from 20 to 30.
+# new data frame, standardized to mean 26.1 and std dev 1.24
+sim2_dat <- data.frame( A=(c(20,30)-26.1)/1.24 )
+s2 <- sim( m5.3_A , data=sim2_dat , vars=c("M","D") )
+mean( s2$D[,2] - s2$D[,1] )
+
+sim_dat <- data.frame( M=seq(from=-2,to=2,length.out=30) , A=0 )
+s <- sim( m5.3_A , data=sim_dat , vars="D" )
+plot( sim_dat$M , colMeans(s) , ylim=c(-2,2) , type="l" ,
+xlab="manipulated M" , ylab="counterfactual D" )
+shade( apply(s,2,PI) , sim_dat$M )
+mtext( "Total counterfactual effect of M on D" )
