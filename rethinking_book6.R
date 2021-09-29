@@ -139,4 +139,91 @@ drawdag( plant_dag )
 impliedConditionalIndependencies(plant_dag)
 
 # Simulating COLLIDER BIAS
+d <- sim_happiness( seed=1977 , N_years=1000 )
+precis(d)
+
+d2 <- d[ d$age>17 , ] # only adults
+d2$A <- ( d2$age - 18 ) / ( 65 - 18 )
+d2$mid <- d2$married + 1
+
+m6.9 <- quap(
+  alist(
+    happiness ~ dnorm( mu , sigma ),
+    mu <- a[mid] + bA*A,
+    a[mid] ~ dnorm( 0 , 1 ),
+    bA ~ dnorm( 0 , 2 ),
+    sigma ~ dexp(1)
+) , data=d2 )
+precis(m6.9,depth=2)
+
+m6.10 <- quap(
+  alist(
+    happiness ~ dnorm( mu , sigma ),
+    mu <- a + bA*A,
+    a ~ dnorm( 0 , 1 ),
+    bA ~ dnorm( 0 , 2 ),
+    sigma ~ dexp(1)
+) , data=d2 )
+precis(m6.10)
+
+# Grandparents, parents, children triad
+N <- 200 #  number of grandparent-parent-child triads
+b_GP <- 1  #  direct  effect of G on P
+b_GC <- 0 #  direct  effect of G on C
+b_PC <- 1  #  direct  effect of P on C
+b_U <- 2  #  direct  effect of U on P and C
+
+set.seed(1)
+U <- 2*rbern( N , 0.5 ) - 1
+G <- rnorm( N )
+P <- rnorm( N , b_GP*G + b_U*U )
+C <- rnorm( N , b_PC*P + b_GC*G + b_U*U )
+d <- data.frame( C=C , P=P , G=G , U=U )
+
+m6.11 <- quap(
+  alist(
+    C ~ dnorm( mu , sigma ),
+    mu <- a + b_PC*P + b_GC*G,
+    a ~ dnorm( 0 , 1 ),
+    c(b_PC,b_GC) ~ dnorm( 0 , 1 ),
+    sigma ~ dexp( 1 )
+), data=d )
+precis(m6.11)
+
+# including the counfounder U of neighborhood
+m6.12 <- quap(
+  alist(
+    C ~ dnorm( mu , sigma ),
+    mu <- a + b_PC*P + b_GC*G + b_U*U,
+    a ~ dnorm( 0 , 1 ),
+    c(b_PC,b_GC,b_U) ~ dnorm( 0 , 1 ),
+    sigma ~ dexp( 1 )
+), data=d )
+precis(m6.12)
+
+# DAGITTY has the analysis to see which one to condition on
+library(dagitty)
+dag_6.1 <- dagitty( "dag {
+U [unobserved]
+X -> Y
+X <- U <- A -> C -> Y
+U -> B <- C
+}")
+adjustmentSets( dag_6.1 , exposure="X" , outcome="Y" )
+
+dag_6.2 <- dagitty( "dag {
+A -> D
+A -> M -> D
+A <- S -> M
+S -> W -> D
+}")
+drawdag(dag_6.2)
+adjustmentSets( dag_6.2 , exposure="W" , outcome="D" )
+
+# we can test if the DAG is wrong using DATA by using CONDITIONAL INDEPENDENCIES
+impliedConditionalIndependencies( dag_6.2 )
+
+
+
+
 
