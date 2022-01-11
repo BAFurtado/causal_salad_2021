@@ -93,5 +93,46 @@ plot( brain_std ~ mass_std , data=d )
 lines( mass_seq , mu )
 shade( ci , mass_seq )
 
+# INFORMATION ENTROPY
+# THE UNCERTAINTY CONTAINED IN A PROBABILITY DISTRIBUTION IS THE AVERAGE LOG-PROBABILITY OF AN EVENT
+# MENOS SUOMATÓRIA DE PI * LOG(PI)
+p <- c( 0.3 , 0.7 )
+-sum( p*log(p) )
 
+# R Code 7.13
+set.seed(1)
+lppd(m7.1, n=1e4)
+
+set.seed(1)
+sapply( list(m7.1,m7.2,m7.3,m7.4,m7.5,m7.6) , function(m) sum(lppd(m)) )
+
+set.seed(71)
+# number of plants
+N <- 100
+# simulate initial heights
+h0 <- rnorm(N,10,2)
+# assign treatments and simulate fungus and growth
+treatment <- rep( 0:1 , each=N/2 )
+fungus <- rbinom( N , size=1 , prob=0.5 - treatment*0.4 )
+h1 <- h0 + rnorm(N, 5 - 3*fungus)
+# compose a clean data frame
+d <- data.frame( h0=h0 , h1=h1 , treatment=treatment , fungus=fungus )
+precis(d)
+
+
+m6.7 <- quap(
+alist(
+h1 ~ dnorm( mu , sigma ),
+mu <- h0 * p,
+p <- a + bt*treatment + bf*fungus,
+a ~ dlnorm( 0 , 0.2 ) ,
+bt ~ dnorm( 0 , 0.5 ),
+bf ~ dnorm( 0 , 0.5 ),
+sigma ~ dexp( 1 )
+), data=d )
+precis(m6.7)
+
+
+set.seed(11)
+WAIC( m6.7 )
 
