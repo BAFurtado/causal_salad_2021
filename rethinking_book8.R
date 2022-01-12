@@ -122,3 +122,7 @@ lines( rugged_seq , mu_mean , lwd=2 )
 shade( mu_ci , rugged_seq )
 mtext("Non-African nations")
 
+rugged_seq <- seq(from=-0.2,to=1.2,length.out=30)
+muA <- link( m8.3 , data=data.frame(cid=1,rugged_std=rugged_seq) )
+muN <- link( m8.3 , data=data.frame(cid=2,rugged_std=rugged_seq) )
+delta <- muA - muN
