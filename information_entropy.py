@@ -1,12 +1,15 @@
 from math import log
+from typing import List
 
 
-def information_entropy_calculus(prob):
+def information_entropy_calculus(prob: List) -> float:
     """
     :param prob: probabilities of an event
     :return: information theory -- the uncertainty contained in a probability distribution
     """
-    ie = -sum(i * log(i) if i > 0 else 0 for i in prob)
+    # ie = -sum(i * log(i) if i > 0 else 0 for i in prob)
+    # ie = -sum(map(log, i))
+    ie = -sum(i * log(i) for i in prob)
     print(f'Information Entropy is {ie:.04f}')
     return ie
 
@@ -20,6 +23,8 @@ def kl_divergence(prob1, prob2):
 
 
 if __name__ == '__main__':
+    p = [.3, .7]
+    information_entropy_calculus(p)
     p = [1, 0]
     print('Maximum entropy: least surprising. You know for sure')
     information_entropy_calculus(p)
